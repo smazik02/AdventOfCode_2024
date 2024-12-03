@@ -1,0 +1,19 @@
+{
+	"name": "day2",
+	"version": "1.0.0",
+	"main": "day2.js",
+	"scripts": {
+		"build": "tsc --build",
+		"serve": "npx ts-node day2.ts",
+		"start": "node ./day2.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"description": "",
+	"devDependencies": {
+		"@types/node": "^22.10.1",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.7.2"
+	}
+}
