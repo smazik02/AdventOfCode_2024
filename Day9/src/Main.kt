@@ -35,36 +35,33 @@ fun main() {
     println("Checksum: $checksum")
 
     // PART 2
-    // BEWARE - IT'S *HORRIBLY* unoptimized, there is probably a better way to solve it, but I haven't figured it out
+    // BEWARE - IT'S *HORRIBLY* unoptimized, there definitely is a better way to solve it, but I haven't figured it out
     val diskContentChunked = ArrayDeque<Int?>()
-    val diskFilesChunked = ArrayDeque<List<Int>>()
+    val diskFilesChunked = LinkedHashMap<List<Int>, Int>()
     fileId = 0
     diskMap.forEachIndexed { index, block ->
         if (block == 0) return@forEachIndexed
 
         if (index % 2 == 0) {
             diskContentChunked.addAll(List(block) { fileId })
-            diskFilesChunked.addFirst(List(block) { fileId })
+            diskFilesChunked[MutableList(block) { fileId }] = diskContentChunked.lastIndex - block + 1
             fileId++
         } else
             diskContentChunked.addAll(List(block) { null })
     }
 
-    diskFilesChunked.forEach { chunk ->
+    diskFilesChunked.reversed().forEach { (chunk, chunkIdx) ->
         if (chunk.first() % 100 == 0) println(chunk.first())
         var spareRoomIdx = -1
-        var chunkIdx = -1
         val compList = List(chunk.size) { null }
         for ((idx, window) in diskContentChunked.windowed(chunk.size).withIndex()) {
-            if (window == compList && spareRoomIdx == -1)
+            if (window == compList) {
                 spareRoomIdx = idx
-            if (window == chunk)
-                chunkIdx = idx
-            if (spareRoomIdx != -1 && chunkIdx != -1)
                 break
+            }
         }
 
-        if (spareRoomIdx == -1 || chunkIdx == -1 || chunkIdx < spareRoomIdx)
+        if (spareRoomIdx == -1 || chunkIdx < spareRoomIdx)
             return@forEach
 
         diskContentChunked
