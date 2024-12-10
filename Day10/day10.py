@@ -1,6 +1,3 @@
-import pprint
-
-
 def traverse_graph_unique_ends(trailhead, adj_list, reached_ends):
     if file_content[trailhead[0]][trailhead[1]] == 9:
         reached_ends.add((trailhead[0], trailhead[1]))
@@ -19,14 +16,6 @@ def traverse_graph_start_unique_ends(trailhead, adj_list):
     return len(reached_ends)
 
 
-def count_unique_ends(trailheads, adj_list):
-    unique_total = 0
-    for trailhead in trailheads:
-        unique = traverse_graph_start_unique_ends(trailhead, adj_list)
-        unique_total += unique
-    return unique_total
-
-
 def traverse_graph_unique_trails(trailhead, adj_list):
     if file_content[trailhead[0]][trailhead[1]] == 9:
         return 1
@@ -37,14 +26,10 @@ def traverse_graph_unique_trails(trailhead, adj_list):
     return sum([traverse_graph_unique_trails(neighbor, adj_list) for neighbor in adj_list[trailhead]])
 
 
-def traverse_graph_start_unique_trails(trailheads, adj_list):
-    return sum([traverse_graph_unique_trails(trailhead, adj_list) for trailhead in trailheads])
-
-
 def main():
     global file_content
     with open("input.txt") as file:
-        file_content = [[int(height, 10) for height in line.strip()]
+        file_content = [[int(height) for height in line.strip()]
                         for line in file.readlines()]
 
     adj_list = dict()
@@ -69,11 +54,11 @@ def main():
                     adj_list.setdefault((row_idx, col_idx), []).append((coord_x, coord_y))
 
     # PART 1
-    unique_paths = count_unique_ends(trailheads, adj_list)
+    unique_paths = sum([traverse_graph_start_unique_ends(trailhead, adj_list) for trailhead in trailheads])
     print(unique_paths)
 
     # PART 2
-    unique_trails = traverse_graph_start_unique_trails(trailheads, adj_list)
+    unique_trails = sum([traverse_graph_unique_trails(trailhead, adj_list) for trailhead in trailheads])
     print(unique_trails)
 
 
