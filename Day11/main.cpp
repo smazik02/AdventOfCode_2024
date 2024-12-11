@@ -1,64 +1,68 @@
-#include <cctype>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <ranges>
 #include <sstream>
-#include <streambuf>
 #include <string>
-#include <vector>
 
-std::vector<uint64_t> parseFile(const std::string& filename);
+std::map<uint64_t, uint64_t> parseFile(const std::string& filename);
 
 int number_of_digits(uint64_t num);
 
-int main(int argc, char* argv[]) {
-    auto fileContent = parseFile(argv[1]);
+void iterate_new_map(const std::map<uint64_t, uint64_t> &old_map, std::map<uint64_t, uint64_t> &new_map);
 
-    // std::cout << "Initial arrangement:\n";
-    // for (const auto num: fileContent) {
-    //     std::cout << num << " ";
-    // }
-    // std::cout << '\n';
+int main(int argc, char* argv[]) {
+    int oldMap = 0;
+    int newMap = 1;
+    auto numberMaps = std::array<std::map<uint64_t, uint64_t>, 2>();
+    numberMaps[0] = parseFile(argv[1]);
 
     for (auto iter = 0; iter < 75; iter++) {
-        std::printf("%d\n", iter);
-        int idx = 0;
-        for (idx = 0; idx < fileContent.size(); ++idx) {
-            auto stone = fileContent[idx];
+        numberMaps[newMap].clear();
 
-            if (stone == 0)
-                fileContent[idx] = 1;
+        iterate_new_map(numberMaps[oldMap], numberMaps[newMap]);
 
-            else if (const int digit_count = number_of_digits(stone); digit_count % 2 == 0) {
-                uint64_t rhs = stone % static_cast<uint64_t>(std::pow(10, digit_count/2));
-                uint64_t lhs = stone / static_cast<uint64_t>(std::pow(10, digit_count/2));
-                fileContent[idx] = lhs;
-                fileContent.insert(fileContent.begin() + idx + 1, rhs);
-                ++idx;
-            }
-
-            else
-                fileContent[idx] *= 2024;
-        }
-        // std::printf("After %d blink:\n", iter);
-        // for (const auto num: fileContent) {
-        //     std::cout << num << " ";
-        // }
-        // std::cout << '\n';
+        oldMap = oldMap == 0 ? 1 : 0;
+        newMap = newMap == 0 ? 1 : 0;
     }
 
-    std::printf("%lu stones", fileContent.size());
+    uint64_t stone_count = 0;
+    for (const auto amount : std::views::values(numberMaps[oldMap])) {
+        stone_count += amount;
+    }
 
-    return 0;
+    std::printf("%lu stones\n", stone_count);
+
+    exit(0);
 }
 
-std::vector<uint64_t> parseFile(const std::string& filename) {
-    std::vector<uint64_t> numbers;
+void iterate_new_map(const std::map<uint64_t, uint64_t> &old_map, std::map<uint64_t, uint64_t> &new_map) {
+    for (const auto [stone, amount]: old_map) {
+        if (stone == 0)
+            new_map[1] += amount;
+
+        else if (const int digit_count = number_of_digits(stone); digit_count % 2 == 0) {
+            uint64_t rhs = stone % static_cast<uint64_t>(std::pow(10, digit_count/2));
+            uint64_t lhs = stone / static_cast<uint64_t>(std::pow(10, digit_count/2));
+            new_map[rhs] += amount;
+            new_map[lhs] += amount;
+        }
+
+        else
+            new_map[stone*2024] += amount;
+    }
+}
+
+std::map<uint64_t, uint64_t> parseFile(const std::string& filename) {
+    std::map<uint64_t, uint64_t> numbers;
     std::ifstream file(filename);
 
     if (!file) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
-        return numbers; // Return an empty vector
+        exit(1);
     }
 
     std::string line;
@@ -67,11 +71,10 @@ std::vector<uint64_t> parseFile(const std::string& filename) {
         uint64_t number;
 
         while (iss >> number) {
-            numbers.push_back(number);
+            numbers[number]++;
         }
     }
 
-    file.close();
     return numbers;
 }
 
