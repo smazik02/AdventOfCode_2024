@@ -1,37 +1,56 @@
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
+
+data class Point(val x: Int, val y: Int)
 
 var fileXSize = 0
 var fileYSize = 0
 val fileContent = mutableListOf<String>()
+val groupIdRepresent = mutableListOf<MutableList<Int>>()
 
-val plantPlots = mutableMapOf<Int, MutableSet<Pair<Int, Int>>>()
+val plantPlots = mutableMapOf<Int, MutableSet<Point>>()
 val plantFences = mutableMapOf<Int, Int>()
+val plantFenceLocations = mutableMapOf<Int, MutableSet<Point>>()
 
-val visitedCoords = mutableSetOf<Pair<Int, Int>>()
+val visitedCoords = mutableSetOf<Point>()
 
-fun isWithinOuterPerimeter(checkedCoords: Pair<Int, Int>) =
-    checkedCoords.first == -1 || checkedCoords.first == fileXSize || checkedCoords.second == -1 || checkedCoords.second == fileYSize
+val minCoordsForId = linkedMapOf<Int, Point>()
+val maxCoordsForId = mutableMapOf<Int, Point>()
 
-fun isWithinBounds(checkedCoords: Pair<Int, Int>, maxX: Int, maxY: Int): Boolean {
-    return checkedCoords.first in 0..maxX && checkedCoords.second in 0..maxY
-}
+fun isWithinOuterPerimeter(checkedCoords: Point) =
+    checkedCoords.x == -1 || checkedCoords.x == fileXSize || checkedCoords.y == -1 || checkedCoords.y == fileYSize
 
-fun plantGroupDFS(coords: Pair<Int, Int>, plant: Char, groupId: Int, groupCoords: MutableSet<Pair<Int, Int>>) {
+fun isWithinBounds(checkedCoords: Point, maxX: Int, maxY: Int) =
+    checkedCoords.x in 0..maxX && checkedCoords.y in 0..maxY
+
+fun plantGroupDFS(coords: Point, plant: Char, groupId: Int, groupCoords: MutableSet<Point>) {
     visitedCoords.add(coords)
     groupCoords.add(coords)
+    groupIdRepresent[coords.x][coords.y] = groupId
 
     val neighCoords = mutableListOf(
-        Pair(coords.first - 1, coords.second),
-        Pair(coords.first, coords.second + 1),
-        Pair(coords.first + 1, coords.second),
-        Pair(coords.first, coords.second - 1),
+        Point(coords.x - 1, coords.y),
+        Point(coords.x, coords.y + 1),
+        Point(coords.x + 1, coords.y),
+        Point(coords.x, coords.y - 1),
     )
+
+    minCoordsForId[groupId] = Point(
+        min(minCoordsForId[groupId]?.x ?: Int.MAX_VALUE, coords.x - 1),
+        min(minCoordsForId[groupId]?.y ?: Int.MAX_VALUE, coords.y - 1)
+    )
+    maxCoordsForId[groupId] = Point(
+        max(maxCoordsForId[groupId]?.x ?: Int.MIN_VALUE, coords.x + 1),
+        max(maxCoordsForId[groupId]?.y ?: Int.MIN_VALUE, coords.y + 1)
+    )
+
     neighCoords.forEach { neighbor ->
         if (isWithinBounds(
                 neighbor,
                 fileXSize - 1,
                 fileYSize - 1
-            ) && neighbor !in visitedCoords && fileContent[neighbor.first][neighbor.second] == plant
+            ) && neighbor !in visitedCoords && fileContent[neighbor.x][neighbor.y] == plant
         )
             plantGroupDFS(neighbor, plant, groupId, groupCoords)
 
@@ -40,9 +59,11 @@ fun plantGroupDFS(coords: Pair<Int, Int>, plant: Char, groupId: Int, groupCoords
                     neighbor,
                     fileXSize - 1,
                     fileYSize - 1
-                ) && fileContent[neighbor.first][neighbor.second] != plant)
-            )
+                ) && fileContent[neighbor.x][neighbor.y] != plant)
+            ) {
                 plantFences[groupId] = (plantFences[groupId] ?: 0) + 1
+                plantFenceLocations.computeIfAbsent(groupId) { mutableSetOf() }.add(neighbor)
+            }
         }
     }
 }
@@ -52,29 +73,122 @@ fun main() {
 
     fileXSize = fileContent.size
     fileYSize = fileContent[0].length
-
-    // Part 1
-    var groupID = 0
-    val plantGroupIds = mutableMapOf<Char, MutableSet<Int>>()
-    fileContent.forEachIndexed rowLoop@{ rowIdx, row ->
-        row.forEachIndexed colLoop@{ colIdx, plant ->
-            val currentCoords = Pair(rowIdx, colIdx)
-            if (currentCoords in visitedCoords) return@colLoop
-
-            plantGroupIds.computeIfAbsent(plant) { mutableSetOf() }.add(groupID)
-            val groupCoords = mutableSetOf<Pair<Int, Int>>()
-            plantGroupDFS(currentCoords, plant, groupID, groupCoords)
-
-            plantPlots.computeIfAbsent(groupID) { mutableSetOf() }.addAll(groupCoords)
-            groupID++
+    for (i in 0..<fileXSize) {
+        groupIdRepresent.add(mutableListOf())
+        repeat(fileYSize) {
+            groupIdRepresent[i].add(0)
         }
     }
 
-    val totalPrice = plantPlots.keys.fold(0) { price, plant ->
+    // Part 1
+    var groupId = 0
+    fileContent.forEachIndexed rowLoop@{ rowIdx, row ->
+        row.forEachIndexed colLoop@{ colIdx, plant ->
+            val currentCoords = Point(rowIdx, colIdx)
+            if (currentCoords in visitedCoords) return@colLoop
+
+            val groupCoords = mutableSetOf<Point>()
+            plantGroupDFS(currentCoords, plant, groupId, groupCoords)
+
+            plantPlots.computeIfAbsent(groupId) { mutableSetOf() }.addAll(groupCoords)
+            groupId++
+        }
+    }
+
+    var totalPrice = plantPlots.keys.fold(0) { price, plant ->
         val area = plantPlots[plant]?.size ?: 0
         val perimeter = plantFences[plant] ?: 0
         price + (area * perimeter)
     }
 
     println("Total price: $totalPrice")
+
+    // Part 2
+    plantFences.clear()
+
+    for ((groupId, _) in minCoordsForId) {
+
+        val rowRange = (minCoordsForId[groupId]!!.x)..(maxCoordsForId[groupId]!!.x)
+        val colRange = (minCoordsForId[groupId]!!.y)..(maxCoordsForId[groupId]!!.y)
+
+        for (rowIdx in rowRange) {
+            var fenceOnTheRight = false
+            var fenceOnTheLeft = false
+            for (colIdx in colRange) {
+
+                if (Point(rowIdx, colIdx) !in (plantFenceLocations[groupId] ?: listOf())) {
+                    fenceOnTheLeft = false
+                    fenceOnTheRight = false
+                    continue
+                }
+
+                val leftNeighbor = Point(rowIdx - 1, colIdx)
+                val rightNeighbor = Point(rowIdx + 1, colIdx)
+
+                if (isWithinBounds(leftNeighbor, fileXSize - 1, fileYSize - 1)) {
+                    if (!fenceOnTheLeft && groupIdRepresent[leftNeighbor.x][leftNeighbor.y] == groupId) {
+                        fenceOnTheLeft = true
+                        plantFences[groupId] = (plantFences[groupId] ?: 0) + 1
+                    }
+
+                    if (fenceOnTheLeft && groupIdRepresent[leftNeighbor.x][leftNeighbor.y] != groupId)
+                        fenceOnTheLeft = false
+                }
+
+                if (isWithinBounds(rightNeighbor, fileXSize - 1, fileYSize - 1)) {
+                    if (!fenceOnTheRight && groupIdRepresent[rightNeighbor.x][rightNeighbor.y] == groupId) {
+                        fenceOnTheRight = true
+                        plantFences[groupId] = (plantFences[groupId] ?: 0) + 1
+                    }
+
+                    if (fenceOnTheRight && groupIdRepresent[rightNeighbor.x][rightNeighbor.y] != groupId)
+                        fenceOnTheRight = false
+                }
+            }
+        }
+
+        for (colIdx in colRange) {
+            var fenceOnTheRight = false
+            var fenceOnTheLeft = false
+            for (rowIdx in rowRange) {
+                if (Point(rowIdx, colIdx) !in (plantFenceLocations[groupId] ?: listOf())) {
+                    fenceOnTheLeft = false
+                    fenceOnTheRight = false
+                    continue
+                }
+
+                val leftNeighbor = Point(rowIdx, colIdx + 1)
+                val rightNeighbor = Point(rowIdx, colIdx - 1)
+
+                if (isWithinBounds(leftNeighbor, fileXSize - 1, fileYSize - 1)) {
+                    if (!fenceOnTheLeft && groupIdRepresent[leftNeighbor.x][leftNeighbor.y] == groupId) {
+                        fenceOnTheLeft = true
+                        plantFences[groupId] = (plantFences[groupId] ?: 0) + 1
+                    }
+
+                    if (fenceOnTheLeft && groupIdRepresent[leftNeighbor.x][leftNeighbor.y] != groupId)
+                        fenceOnTheLeft = false
+                }
+
+                if (isWithinBounds(rightNeighbor, fileXSize - 1, fileYSize - 1)) {
+                    if (!fenceOnTheRight && groupIdRepresent[rightNeighbor.x][rightNeighbor.y] == groupId) {
+                        fenceOnTheRight = true
+                        plantFences[groupId] = (plantFences[groupId] ?: 0) + 1
+                    }
+
+                    if (fenceOnTheRight && groupIdRepresent[rightNeighbor.x][rightNeighbor.y] != groupId)
+                        fenceOnTheRight = false
+                }
+            }
+        }
+
+    }
+
+    totalPrice = plantPlots.keys.fold(0) { price, plant ->
+        val area = plantPlots[plant]?.size ?: 0
+        val perimeter = plantFences[plant] ?: 0
+        price + (area * perimeter)
+    }
+
+    println("Total price combined: $totalPrice")
 }
