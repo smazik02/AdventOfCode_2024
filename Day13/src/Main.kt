@@ -1,38 +1,17 @@
 import java.io.File
-import kotlin.math.min
 
 data class Point(val x: Long, val y: Long)
 
 data class Machine(val buttonAPress: Point, val buttonBPress: Point, val prize: Point)
-
-private operator fun Point.plus(point: Point): Point {
-    return Point(this.x + point.x, this.y + point.y)
-}
-
-private operator fun Point.minus(point: Point): Point {
-    return Point(this.x - point.x, this.y - point.y)
-}
-
-private operator fun Point.rem(point: Point): Point {
-    return Point(this.x % point.x, this.y % point.y)
-}
-
-fun GCD(a: Long, b: Long): Long {
-    var num1 = a
-    var num2 = b
-    while (num2 != 0L) {
-        val temp = num2
-        num2 = num1 % num2
-        num1 = temp
-    }
-    return num1
-}
 
 fun main() {
     val machineList = mutableListOf<Machine>()
 
     val buttonRegex = Regex("Button [AB]: X\\+(\\d+), Y\\+(\\d+)")
     val prizeRegex = Regex("Prize: X=(\\d+), Y=(\\d+)")
+
+    val forTask2 = 10000000000000L
+
     File("inputs/input.txt").readText().split("\n\n").forEach { machineDescription ->
         val buttonMatches = buttonRegex.findAll(machineDescription)
         val buttonAPress =
@@ -44,43 +23,28 @@ fun main() {
             )
 
         val prizeMatch = prizeRegex.find(machineDescription)
-        val prize =
-            Point(prizeMatch?.groupValues?.get(1)?.toLong() ?: -1L, prizeMatch?.groupValues?.get(2)?.toLong() ?: -1L)
+        val prize = Point(
+            (prizeMatch?.groupValues?.get(1)?.toLong() ?: -1L) + forTask2,
+            (prizeMatch?.groupValues?.get(2)?.toLong() ?: -1L) + forTask2
+        )
 
         machineList.add(Machine(buttonAPress, buttonBPress, prize))
     }
 
     var tokenCount = 0L
-    machineLoop@ for ((idx, machine) in machineList.withIndex()) {
-        println(idx)
-//        var tokenMin = Long.MAX_VALUE
+    for (machine in machineList) {
+        val w = machine.buttonAPress.x * machine.buttonBPress.y - machine.buttonAPress.y * machine.buttonBPress.x
+        val wx = machine.prize.x * machine.buttonBPress.y - machine.prize.y * machine.buttonBPress.x
+        val wy = machine.buttonAPress.x * machine.prize.y - machine.buttonAPress.y * machine.prize.x
 
-        val xCondition = machine.prize.x % GCD(machine.buttonAPress.x, machine.buttonBPress.x) == 0L
-        val yCondition = machine.prize.y % GCD(machine.buttonAPress.y, machine.buttonBPress.y) == 0L
-        if (!xCondition || !yCondition)
-            continue
+        if (w == 0L && wx == 0L && wy == 0L) continue
+        if ((wx.toDouble() / w.toDouble()) % 1L != 0.0 || (wy.toDouble() / w.toDouble()) % 1L != 0.0) continue
 
-        val xCount = machine.prize.x / machine.buttonBPress.x
-        val yCount = machine.prize.y / machine.buttonBPress.y
+        val finalPos = Point(wx / w, wy / w)
 
-        var aCount: Long
-        var bCount = min(xCount, yCount)
+        if (finalPos.x < 0 || finalPos.y < 0) continue
 
-        while (bCount-- >= 0L) {
-            val currentPosition = Point(bCount * machine.buttonBPress.x, bCount * machine.buttonBPress.y)
-
-            val positionDifference = machine.prize - currentPosition
-
-            if ((positionDifference % machine.buttonAPress) == Point(0L, 0L)) {
-                if (positionDifference.x / machine.buttonAPress.x != positionDifference.y / machine.buttonAPress.y)
-                    continue
-                aCount = positionDifference.x / machine.buttonAPress.x
-                tokenCount += (aCount * 3L + bCount)
-                continue@machineLoop
-            }
-        }
-
-//        tokenCount += if (tokenMin == Int.MAX_VALUE) 0 else tokenMin
+        tokenCount += finalPos.x * 3 + finalPos.y
     }
 
     println("$tokenCount tokens")
